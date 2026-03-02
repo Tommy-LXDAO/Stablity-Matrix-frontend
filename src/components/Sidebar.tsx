@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-
 interface Conversation {
   id: string;
   title: string;
@@ -16,25 +14,15 @@ interface SidebarProps {
   onNewConversation?: () => void;
 }
 
-const demoConversations: Conversation[] = [
-  { id: 'sess_001', title: '分析空指针异常', lastUpdated: '2024-01-15 14:30' },
-  { id: 'sess_002', title: '内存泄漏问题排查', lastUpdated: '2024-01-14 10:20' },
-  { id: 'sess_003', title: '数据库连接超时', lastUpdated: '2024-01-13 16:45' },
-  { id: 'sess_004', title: 'API返回500错误', lastUpdated: '2024-01-12 09:15' },
-];
-
 export default function Sidebar({
-  conversations = demoConversations,
-  currentSessionId = 'sess_001',
+  conversations = [],
+  currentSessionId = null,
   onSelectConversation,
   onDeleteConversation,
   onNewConversation,
 }: SidebarProps) {
-  const [localConversations, setLocalConversations] = useState(conversations);
-
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    setLocalConversations(prev => prev.filter(conv => conv.id !== id));
     onDeleteConversation?.(id);
   };
 
@@ -70,7 +58,7 @@ export default function Sidebar({
       {/* 会话列表 */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-2">
-          {localConversations.map((conv) => (
+          {conversations.map((conv) => (
             <div
               key={conv.id}
               onClick={() => onSelectConversation?.(conv.id)}
@@ -113,7 +101,7 @@ export default function Sidebar({
             </div>
           ))}
 
-          {localConversations.length === 0 && (
+          {conversations.length === 0 && (
             <div className="text-center text-gray-400 py-8 text-sm">
               暂无会话记录
             </div>

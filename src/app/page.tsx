@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MessageList from '@/components/MessageList';
 import InputArea from '@/components/InputArea';
 import Sidebar from '@/components/Sidebar';
+import { API_CONFIG } from '@/config/api';
 
 interface CrashAnalysisResult {
   rootCause: string;
@@ -20,24 +21,112 @@ interface Message {
   crashAnalysisResult?: CrashAnalysisResult;
 }
 
+interface Conversation {
+  id: string;
+  title: string;
+  lastUpdated: string;
+}
+
+const STORAGE_KEY = 'conversations';
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  // 从 localStorage 加载会话列表
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setConversations(parsed);
+        if (parsed.length > 0) {
+          setCurrentSessionId(parsed[0].id);
+        }
+      } catch (e) {
+        console.error('加载会话列表失败:', e);
+      }
+    }
+  }, []);
+
+  // 保存会话列表到 localStorage
+  const saveConversations = (newConversations: Conversation[]) => {
+    setConversations(newConversations);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newConversations));
+  };
+
+  // 创建新会话
+  const handleNewConversation = async () => {
+    const newSessionId = await getSessionId();
+    if (newSessionId) {
+      const newConversation: Conversation = {
+        id: newSessionId,
+        title: '新会话',
+        lastUpdated: new Date().toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+      };
+      const updated = [newConversation, ...conversations];
+      saveConversations(updated);
+      setCurrentSessionId(newSessionId);
+      setMessages([]);
+      setSessionId(newSessionId);
+    }
+  };
+
+  // 选择会话
+  const handleSelectConversation = (id: string) => {
+    setCurrentSessionId(id);
+    setSessionId(id);
+    // TODO: 加载对应会话的消息历史
+  };
+
+  // 删除会话
+  const handleDeleteConversation = (id: string) => {
+    const updated = conversations.filter(conv => conv.id !== id);
+    saveConversations(updated);
+    if (currentSessionId === id && updated.length > 0) {
+      setCurrentSessionId(updated[0].id);
+      setSessionId(updated[0].id);
+    }
+  };
 
   // 获取 sessionId
   const getSessionId = async (): Promise<string | null> => {
     if (sessionId) return sessionId;
 
     try {
-      const response = await fetch('http://localhost:8888/session/create', {
+      const response = await fetch(`${API_CONFIG.baseUrl}/session/create`, {
         method: 'POST',
       });
       const data = await response.json();
       if (data.sessionId) {
         setSessionId(data.sessionId);
+
+        // 将标题和sessionId封装为对象，放入localStorage
+        const newConversation: Conversation = {
+          id: data.sessionId,
+          title: '新会话',
+          lastUpdated: new Date().toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+        };
+        const updated = [newConversation, ...conversations];
+        saveConversations(updated);
+
         return data.sessionId;
       }
     } catch (error) {
@@ -76,7 +165,7 @@ export default function Home() {
       }
       files.forEach(file => formData.append('files', file));
 
-      const response = await fetch('http://localhost:8888/ai/analyze', {
+      const response = await fetch(`${API_CONFIG.baseUrl}/ai/analyze`, {
         method: 'POST',
         body: formData,
       });
@@ -124,7 +213,13 @@ export default function Home() {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* 左侧侧边栏 */}
-      <Sidebar />
+      <Sidebar
+        conversations={conversations}
+        currentSessionId={currentSessionId}
+        onSelectConversation={handleSelectConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onNewConversation={handleNewConversation}
+      />
 
       {/* 右侧主内容区 */}
       <div className="flex-1 flex flex-col max-w-4xl mx-auto">

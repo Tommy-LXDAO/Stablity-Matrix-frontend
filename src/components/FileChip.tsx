@@ -5,7 +5,7 @@ interface FileChipProps {
 
 export default function FileChip({ file, onRemove }: FileChipProps) {
   return (
-    <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded text-sm">
+    <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded text-sm text-gray-700">
       📎 {file.name}
       <button
         onClick={onRemove}

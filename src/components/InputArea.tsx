@@ -69,7 +69,7 @@ export default function InputArea({
           onChange={e => onInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="输入消息..."
-          className="flex-1 resize-none border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 resize-none border rounded-lg px-4 py-2 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           rows={1}
         />
         <button
