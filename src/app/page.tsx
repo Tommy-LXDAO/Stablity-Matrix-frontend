@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import MessageList from '@/components/MessageList';
 import InputArea from '@/components/InputArea';
+import Sidebar from '@/components/Sidebar';
 
 interface CrashAnalysisResult {
   rootCause: string;
@@ -121,20 +122,26 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col h-screen max-w-4xl mx-auto bg-gray-50">
-      <div className="flex-1 overflow-y-auto p-4">
-        <MessageList messages={messages} />
-      </div>
+    <div className="flex h-screen bg-gray-50">
+      {/* 左侧侧边栏 */}
+      <Sidebar />
 
-      <InputArea
-        input={input}
-        files={files}
-        isLoading={isLoading}
-        onInputChange={setInput}
-        onFileSelect={handleFileSelect}
-        onFileRemove={handleFileRemove}
-        onSend={handleSend}
-      />
+      {/* 右侧主内容区 */}
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto">
+        <div className="flex-1 overflow-y-auto p-4">
+          <MessageList messages={messages} />
+        </div>
+
+        <InputArea
+          input={input}
+          files={files}
+          isLoading={isLoading}
+          onInputChange={setInput}
+          onFileSelect={handleFileSelect}
+          onFileRemove={handleFileRemove}
+          onSend={handleSend}
+        />
+      </div>
     </div>
   );
 }
