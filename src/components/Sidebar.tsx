@@ -25,7 +25,10 @@ export default function Sidebar({
     e.stopPropagation();
     onDeleteConversation?.(id);
   };
-
+  const uniqueConversations = conversations.filter(
+    (conv, index, self) =>
+      index === self.findIndex((c) => c.id === conv.id)
+  );
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col">
       <div className="p-4 border-b border-gray-200">
@@ -58,7 +61,7 @@ export default function Sidebar({
       {/* 会话列表 */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-2">
-          {conversations.map((conv) => (
+          {uniqueConversations.map((conv) => (
             <div
               key={conv.id}
               onClick={() => onSelectConversation?.(conv.id)}
