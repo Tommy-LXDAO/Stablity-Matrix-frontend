@@ -14,6 +14,7 @@ interface MessageBubbleProps {
 
 export default function MessageBubble({ role, content, files, crashAnalysisResult }: MessageBubbleProps) {
   const isUser = role === 'user';
+  const hasContent = content.trim().length > 0;
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -24,11 +25,13 @@ export default function MessageBubble({ role, content, files, crashAnalysisResul
             : 'bg-white border border-gray-200 text-gray-800'
         }`}
       >
-        <div className="whitespace-pre-wrap">{content}</div>
+        {hasContent && (
+          <div className="whitespace-pre-wrap">{content}</div>
+        )}
 
         {/* 渲染崩溃分析结果 */}
         {crashAnalysisResult && !isUser && (
-          <div className="mt-4 pt-3 border-t border-gray-200">
+          <div className={hasContent ? 'mt-4 border-t border-gray-200 pt-3' : ''}>
             <h3 className="font-bold text-lg mb-2 text-red-600">崩溃分析结果</h3>
 
             <div className="mb-3">

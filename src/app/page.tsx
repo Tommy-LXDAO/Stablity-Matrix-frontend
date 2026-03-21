@@ -27,6 +27,14 @@ interface Conversation {
   lastUpdated: string;
 }
 
+interface AnalyzeResponsePayload {
+  success?: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+  aiAnalysis?: string;
+  crashAnalysisResult?: CrashAnalysisResult;
+}
+
 const STORAGE_KEY = 'conversations';
 
 export default function Home() {
@@ -105,7 +113,7 @@ export default function Home() {
     if (sessionId) return sessionId;
 
     try {
-      const response = await fetch(`${API_CONFIG.baseUrl}/session/create`, {
+      const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.createSession}`, {
         method: 'POST',
       });
       const data = await response.json();
@@ -165,17 +173,24 @@ export default function Home() {
       }
       files.forEach(file => formData.append('files', file));
 
-      const response = await fetch(`${API_CONFIG.baseUrl}/ai/analyze`, {
+      const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.analyzeReact}`, {
         method: 'POST',
         body: formData,
       });
 
-      const data = await response.json();
+      const data: AnalyzeResponsePayload = await response.json();
+      const success = data.success ?? response.ok;
 
       // 判断请求是否成功，提取 crashAnalysisResult
-      const crashResult = data.success && data.crashAnalysisResult
+      const crashResult = success && data.crashAnalysisResult
         ? data.crashAnalysisResult
         : undefined;
+
+      const responseContent = success
+        ? ''
+        : data.errorMessage ??
+          data.errorCode ??
+          JSON.stringify(data);
 
       // 更新AI回复
       setMessages(prev =>
@@ -183,7 +198,7 @@ export default function Home() {
           msg.id === loadingId
             ? {
                 ...msg,
-                content: data.result || data.message || (data.success ? '请求成功' : JSON.stringify(data)),
+                content: responseContent,
                 crashAnalysisResult: crashResult
               }
             : msg
