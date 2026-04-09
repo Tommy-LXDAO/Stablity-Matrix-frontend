@@ -13,12 +13,21 @@ interface CrashAnalysisResult {
   prevention: string[];
 }
 
+interface ReactStep {
+  step: number;
+  thought: string;
+  action: string;
+  actionInput: string;
+  observation: string;
+}
+
 interface Message {
   id: number;
   role: 'user' | 'ai';
   content: string;
   files?: File[];
   crashAnalysisResult?: CrashAnalysisResult;
+  reactSteps?: ReactStep[];
 }
 
 interface Conversation {
@@ -28,6 +37,28 @@ interface Conversation {
 }
 
 const STORAGE_KEY = 'conversations';
+
+function formatCrashAnalysisResult(result: CrashAnalysisResult): string {
+  return [
+    `根因: ${result.rootCause}`,
+    result.triggers?.length ? `触发条件:\n- ${result.triggers.join('\n- ')}` : '',
+    result.solutions?.length ? `解决方案:\n- ${result.solutions.join('\n- ')}` : '',
+    result.prevention?.length ? `预防措施:\n- ${result.prevention.join('\n- ')}` : '',
+  ].filter(Boolean).join('\n\n');
+}
+
+function formatReactSteps(steps?: ReactStep[]): string {
+  if (!steps || steps.length === 0) {
+    return '';
+  }
+
+  return steps.map(step => [
+    `步骤 ${step.step}`,
+    step.thought ? `Thought: ${step.thought}` : '',
+    step.action ? `Action: ${step.action}` : '',
+    step.observation ? `Observation: ${step.observation}` : '',
+  ].filter(Boolean).join('\n')).join('\n\n');
+}
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -138,11 +169,14 @@ export default function Home() {
   const handleSend = async () => {
     if (!input.trim() && files.length === 0) return;
 
+    const currentInput = input;
+    const currentFiles = [...files];
+
     const userMessage: Message = {
       id: Date.now(),
       role: 'user',
-      content: input,
-      files: files.length > 0 ? [...files] : undefined,
+      content: currentInput,
+      files: currentFiles.length > 0 ? currentFiles : undefined,
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -155,36 +189,77 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      // 获取 sessionId
       const currentSessionId = await getSessionId();
-
-      const formData = new FormData();
-      formData.append('question', input);
-      if (currentSessionId) {
-        formData.append('sessionId', currentSessionId);
+      if (!currentSessionId) {
+        throw new Error('无法创建会话');
       }
-      files.forEach(file => formData.append('files', file));
 
-      const response = await fetch(`${API_CONFIG.baseUrl}/ai/analyze`, {
-        method: 'POST',
-        body: formData,
-      });
+      const hasFiles = currentFiles.length > 0;
+      let response: Response;
+      let data: Record<string, unknown>;
+      let content = '';
+      let crashResult: CrashAnalysisResult | undefined;
+      let reactSteps: ReactStep[] | undefined;
 
-      const data = await response.json();
+      if (hasFiles) {
+        const formData = new FormData();
+        formData.append('question', currentInput);
+        formData.append('sessionId', currentSessionId);
+        currentFiles.forEach(file => formData.append('files', file));
 
-      // 判断请求是否成功，提取 crashAnalysisResult
-      const crashResult = data.success && data.crashAnalysisResult
-        ? data.crashAnalysisResult
-        : undefined;
+        response = await fetch(`${API_CONFIG.baseUrl}/ai/analyze`, {
+          method: 'POST',
+          body: formData,
+        });
+        data = await response.json();
 
-      // 更新AI回复
+        crashResult = data.success && data.crashAnalysisResult
+          ? data.crashAnalysisResult as CrashAnalysisResult
+          : undefined;
+
+        content =
+          (typeof data.aiAnalysis === 'string' && data.aiAnalysis) ||
+          (crashResult ? formatCrashAnalysisResult(crashResult) : '') ||
+          (Array.isArray(data.processLogs) ? data.processLogs.join('\n') : '') ||
+          (typeof data.errorMessage === 'string' && data.errorMessage) ||
+          (data.success ? '文件已处理，但没有生成可展示的分析结论。' : JSON.stringify(data));
+      } else {
+        response = await fetch(`${API_CONFIG.baseUrl}/ai/react`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sessionId: currentSessionId,
+            question: currentInput,
+          }),
+        });
+        data = await response.json();
+
+        reactSteps = Array.isArray(data.steps) ? data.steps as ReactStep[] : undefined;
+        content =
+          (typeof data.answer === 'string' && data.answer) ||
+          (typeof data.errorMessage === 'string' && data.errorMessage) ||
+          (data.success ? '对话已完成，但没有返回回答内容。' : JSON.stringify(data));
+
+        const stepTrace = formatReactSteps(reactSteps);
+        if (stepTrace) {
+          content = `${content}\n\n${stepTrace}`;
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(content || `请求失败: HTTP ${response.status}`);
+      }
+
       setMessages(prev =>
         prev.map(msg =>
           msg.id === loadingId
             ? {
                 ...msg,
-                content: data.result || data.message || (data.success ? '请求成功' : JSON.stringify(data)),
-                crashAnalysisResult: crashResult
+                content,
+                crashAnalysisResult: crashResult,
+                reactSteps,
               }
             : msg
         )
